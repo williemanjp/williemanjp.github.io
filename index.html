@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>要素比較ランキング</title>
+    <style>
+        /* スタイリングは省略しますが、比較要素はボタンなどで表示します */
+        #comparison-area button {
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #result-area {
+            margin-top: 20px;
+            border-top: 1px solid #ccc;
+            padding-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>要素比較ランキングメーカー</h1>
+
+    <div id="input-area">
+        <textarea id="element-names" rows="5" cols="40" placeholder="比較したい要素名を改行で区切って入力してください。例：トイ・ストーリー&#10;モンスターズ・インク&#10;ファインディング・ニモ"></textarea>
+        <button onclick="initializeApp()">比較開始</button>
+        <p id="message"></p>
+    </div>
+
+    <hr>
+
+    <div id="comparison-area">
+        <h2>どちらが好きですか？</h2>
+        <div id="comparison-buttons">
+            </div>
+    </div>
+
+    <div id="result-area">
+        <h2>ランキング結果</h2>
+        <ul id="ranking-list">
+            </ul>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
