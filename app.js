@@ -1,6 +1,6 @@
 // 全要素を格納する配列。各要素は { name: string, point: number } の形式
 let elements = [];
-let comparisonCounter = 0; // 比較回数カウンター (新規追加)
+let comparisonCounter = 0; // 比較回数カウンター
 
 // DOM要素の取得
 const messageEl = document.getElementById('message');
@@ -8,7 +8,7 @@ const comparisonButtonsEl = document.getElementById('comparison-buttons');
 const rankingListEl = document.getElementById('ranking-list');
 const comparisonAreaEl = document.getElementById('comparison-area');
 
-// 新規追加のDOM要素
+// 途中経過とJSON入出力のDOM要素
 const comparisonCountEl = document.getElementById('comparison-count');
 const uniquePointsCountEl = document.getElementById('unique-points-count');
 const totalElementsCountEl = document.getElementById('total-elements-count');
@@ -42,11 +42,12 @@ function initializeApp() {
     comparisonCounter = 0; // カウンターをリセット
     rankingListEl.innerHTML = '';
     comparisonAreaEl.style.display = 'block';
+    jsonIoAreaEl.style.display = 'block';
 
     messageEl.textContent = `${elements.length}個の要素で比較を開始します。`;
     
-    updateStatus(); // 途中経過を更新 (新規追加)
-    exportToJSON(); // JSON出力 (新規追加)
+    updateStatus(); // 途中経過を更新
+    exportToJSON(); // JSON出力を更新
     startComparison();
 }
 
@@ -70,7 +71,6 @@ function startComparison() {
     const comparablePoints = Object.keys(pointsMap).filter(point => pointsMap[point].length >= 2);
 
     if (comparablePoints.length === 0) {
-        // 全要素がユニークでないのに比較可能な要素がない場合、ロジックエラーまたは特殊な状態
         messageEl.textContent = 'エラー: 比較可能な要素が見つかりません。ランキングを確定します。';
         displayResult();
         return;
@@ -95,23 +95,23 @@ function selectWinner(winnerName) {
     const winner = elements.find(el => el.name === winnerName);
     if (winner) {
         winner.point += 1;
-        comparisonCounter += 1; // 比較回数をカウントアップ (新規追加)
+        comparisonCounter += 1; // 比較回数をカウントアップ
         messageEl.textContent = `「${winnerName}」を選択しました。ポイントが加算されました。`;
     }
 
-    updateStatus();  // 途中経過を更新 (新規追加)
-    exportToJSON();  // JSON出力も更新 (新規追加)
+    updateStatus();  // 途中経過を更新
+    exportToJSON();  // JSON出力も更新
     
     // 次の比較を開始
     startComparison();
 }
 
 // ------------------------------------
-// ユーティリティ関数（改修・新規追加）
+// ユーティリティ関数
 // ------------------------------------
 
 /**
- * 6. 途中経過を計算し、画面に表示する (新規追加)
+ * 6. 途中経過を計算し、画面に表示する
  */
 function updateStatus() {
     const uniquePoints = new Set(elements.map(el => el.point));
@@ -120,9 +120,10 @@ function updateStatus() {
     uniquePointsCountEl.textContent = uniquePoints.size;
     totalElementsCountEl.textContent = elements.length;
 
-    // 途中経過でのポイント順位も表示
+    // 途中経過でのポイント順位を暫定ランキングとして表示
     const sortedElements = [...elements].sort((a, b) => b.point - a.point);
-    rankingListEl.innerHTML = '';
+    rankingListEl.innerHTML = '<h3>🏆 暫定ランキング 🏆</h3>';
+    
     sortedElements.forEach((el, index) => {
         const listItem = document.createElement('li');
         listItem.textContent = `暫定順位: ${el.name} (${el.point}ポイント)`;
@@ -132,7 +133,7 @@ function updateStatus() {
 
 
 /**
- * 6. elements配列の状態をJSONとして出力する (新規追加)
+ * 6. elements配列の状態をJSONとして出力する
  */
 function exportToJSON() {
     const dataToSave = {
@@ -144,7 +145,7 @@ function exportToJSON() {
 }
 
 /**
- * 6. JSONを入力し、elements配列の状態を復元する (新規追加)
+ * 6. JSONを入力し、elements配列の状態を復元する
  */
 function loadFromJSON() {
     const jsonString = inputJsonDataEl.value.trim();
@@ -176,7 +177,7 @@ function loadFromJSON() {
 }
 
 /**
- * JSONコピーボタンの処理 (新規追加)
+ * JSONコピーボタンの処理
  */
 function copyToClipboard() {
     outputJsonEl.select();
@@ -185,13 +186,19 @@ function copyToClipboard() {
 }
 
 
-// --- 既存のユーティリティ関数（変更なし） ---
+// --- 既存のコアロジック関数 ---
 
+/**
+ * 4. 全要素のポイントがユニークかどうかを確認する
+ */
 function checkAllPointsUnique() {
     const uniquePoints = new Set(elements.map(el => el.point));
     return uniquePoints.size === elements.length;
 }
 
+/**
+ * 1. ポイントごとに要素をグループ化する
+ */
 function groupElementsByPoint() {
     const map = {};
     elements.forEach(el => {
@@ -203,6 +210,10 @@ function groupElementsByPoint() {
     return map;
 }
 
+/**
+ * 3. リストからランダムに2つの異なる要素を選ぶ
+ * @param {Array<Object>} list - 比較する要素のリスト
+ */
 function getRandomPair(list) {
     if (list.length < 2) return [];
 
@@ -215,6 +226,9 @@ function getRandomPair(list) {
     return [list[index1], list[index2]];
 }
 
+/**
+ * 画面に比較ボタンを表示する
+ */
 function renderComparison(elA, elB) {
     comparisonButtonsEl.innerHTML = '';
     
@@ -250,6 +264,6 @@ function displayResult() {
         rankingListEl.appendChild(listItem);
     });
 
-    comparisonAreaEl.style.display = 'none';
-    jsonIoAreaEl.style.display = 'none'; // 最終結果表示後はJSONエリアも非表示にするなど、必要に応じて
+    comparisonAreaEl.style.display = 'none'; // 比較エリアを非表示
+    jsonIoAreaEl.style.display = 'none'; // JSONエリアを非表示
 }
