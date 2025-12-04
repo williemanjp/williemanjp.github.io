@@ -1,47 +1,21 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <title>要素比較ランキング</title>
-    <style>
-        /* スタイリングは省略しますが、比較要素はボタンなどで表示します */
-        #comparison-area button {
-            padding: 10px 20px;
-            margin: 5px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-        #result-area {
-            margin-top: 20px;
-            border-top: 1px solid #ccc;
-            padding-top: 10px;
-        }
-    </style>
-</head>
-<body>
+<hr>
 
-    <h1>要素比較ランキングメーカー</h1>
-
-    <div id="input-area">
-        <textarea id="element-names" rows="5" cols="40" placeholder="比較したい要素名を改行で区切って入力してください。例：トイ・ストーリー&#10;モンスターズ・インク&#10;ファインディング・ニモ"></textarea>
-        <button onclick="initializeApp()">比較開始</button>
-        <p id="message"></p>
+    <div id="status-area">
+        <h2>現在の状況</h2>
+        <p>比較回数: <span id="comparison-count">0</span>回</p>
+        <p>ユニークなポイント数: <span id="unique-points-count">0</span> / <span id="total-elements-count">0</span></p>
     </div>
 
     <hr>
-
-    <div id="comparison-area">
-        <h2>どちらが好きですか？</h2>
-        <div id="comparison-buttons">
-            </div>
+    
+    <div id="json-io-area">
+        <h2>データ入出力</h2>
+        
+        <h3>現在のデータをJSON形式で出力 (保存用)</h3>
+        <textarea id="output-json" rows="8" cols="60" readonly></textarea>
+        <button onclick="copyToClipboard()">JSONをコピー</button>
+        
+        <h3>JSONデータを入力して途中から再開</h3>
+        <textarea id="input-json-data" rows="8" cols="60" placeholder="保存したJSONデータをここに貼り付けてください。"></textarea>
+        <button onclick="loadFromJSON()">JSONを読み込み</button>
     </div>
-
-    <div id="result-area">
-        <h2>ランキング結果</h2>
-        <ul id="ranking-list">
-            </ul>
-    </div>
-
-    <script src="app.js"></script>
-</body>
-</html>
