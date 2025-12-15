@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>バナナマフィン・フィーバー (コアゲーム)</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f4e9d7; /* マフィン生地のような色 */
+            color: #382c1e;
+        }
+        #game-title {
+            color: #8b4513; /* チョコレート色 */
+            margin-bottom: 10px;
+        }
+        #game-container {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        #info-panel {
+            background-color: #ffffff;
+            border: 3px solid #8b4513;
+            padding: 15px;
+            border-radius: 8px;
+            width: 150px;
+            text-align: center;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        .info-box {
+            margin-bottom: 10px;
+            padding: 5px;
+            border-bottom: 1px solid #ccc;
+        }
+        #board {
+            display: grid;
+            grid-template-columns: repeat(6, 60px); /* 6x6の盤面 */
+            grid-template-rows: repeat(6, 60px);
+            border: 5px solid #a0522d;
+            border-radius: 10px;
+            background-color: #f0f0f0;
+        }
+        .block {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 30px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            user-select: none;
+            transition: transform 0.1s;
+        }
+        .block.selected {
+            border: 3px solid red;
+            transform: scale(1.05);
+        }
+        #game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 40px;
+            z-index: 10;
+        }
+        #restart-button {
+            padding: 10px 20px;
+            font-size: 20px;
+            cursor: pointer;
+            margin-top: 20px;
+            border: none;
+            border-radius: 5px;
+            background-color: #ff9800;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <h1 id="game-title">バナナマフィン・フィーバー (コアゲーム)</h1>
+    <p>隣り合うブロックを入れ替えて、同じ材料を3つ以上揃えて消そう！</p>
+
+    <div id="game-container">
+        <div id="info-panel">
+            <div class="info-box">
+                <strong>残り時間</strong>
+                <div id="time-display">60</div>
+            </div>
+            <div class="info-box">
+                <strong>マフィン完成数</strong>
+                <div id="muffin-count">0 / 10</div>
+            </div>
+            <div class="info-box">
+                <strong>スコア</strong>
+                <div id="score-display">0</div>
+            </div>
+            <p style="font-size: small; margin-top: 15px;">? バナナ, ? 小麦粉, ? 砂糖, ? タイマー(+1秒)</p>
+        </div>
+        <div id="board">
+            </div>
+    </div>
+
+    <div id="game-over-screen">
+        <h2>タイムアップ！</h2>
+        <p id="final-muffins"></p>
+        <button id="restart-button">もう一度プレイ</button>
+    </div>
+
+    <script>
+        // --- 設定 ---
+        const ROWS = 6;
+        const COLS = 6;
+        const BLOCK_TYPES = ['?', '?', '?', '?']; // バナナ, 小麦粉, 砂糖, オーブンタイマー
+        const TIME_LIMIT = 60; // 制限時間 (秒)
+        const MUFFIN_GOAL = 10; // 目標マフィン数
+        
+        // --- ゲーム状態 ---
+        let board = [];
+        let selectedBlock = null; // 選択中のブロック {row, col, element}
+        let score = 0;
+        let muffinCount = 0;
+        let timeLeft = TIME_LIMIT;
+        let gameInterval;
+        let isProcessing = false; // アニメーション・マッチ処理中フラグ
+
+        // --- DOM要素 ---
+        const boardElement = document.getElementById('board');
+        const timeDisplay = document.getElementById('time-display');
+        const muffinCountDisplay = document.getElementById('muffin-count');
+        const scoreDisplay = document.getElementById('score-display');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const finalMuffinsDisplay = document.getElementById('final-muffins');
+        const restartButton = document.getElementById('restart-button');
+
+        // --- 初期化 ---
+        function startGame() {
+            // 状態リセット
+            board = [];
+            selectedBlock = null;
+            score = 0;
+            muffinCount = 0;
+            timeLeft = TIME_LIMIT;
+            isProcessing = false;
+            
+            // UIリセット
+            boardElement.innerHTML = '';
+            gameOverScreen.style.display = 'none';
+            scoreDisplay.textContent = score;
+            muffinCountDisplay.textContent = `${muffinCount} / ${MUFFIN_GOAL}`;
+            timeDisplay.textContent = timeLeft;
+
+            // 盤面生成
+            initializeBoard();
+
+            // タイマー開始
+            clearInterval(gameInterval);
+            gameInterval = setInterval(updateTimer, 1000);
+        }
+
+        // 連続で3つ以上揃わないように初期化
+        function initializeBoard() {
+            for (let r = 0; r < ROWS; r++) {
+                board[r] = [];
+                for (let c = 0; c < COLS; c++) {
+                    let type;
+                    do {
+                        type = getRandomBlockType();
+                    } while (checkInitialMatch(r, c, type));
+                    board[r][c] = type;
+                    createBlockElement(r, c, type);
+                }
+            }
+        }
+
+        function getRandomBlockType() {
+            // タイマー(?)は出現率を低く設定 (例: 1/8)
+            if (Math.random() < 0.125) {
+                return '?';
+            }
+            const basicTypes = ['?', '?', '?'];
+            const index = Math.floor(Math.random() * basicTypes.length);
+            return basicTypes[index];
+        }
+
+        function checkInitialMatch(r, c, type) {
+            // 水平チェック
+            if (c >= 2 && board[r][c - 1] === type && board[r][c - 2] === type) return true;
+            // 垂直チェック
+            if (r >= 2 && board[r - 1][c] === type && board[r - 2][c] === type) return true;
+            return false;
+        }
+
+        function createBlockElement(r, c, type) {
+            const block = document.createElement('div');
+            block.classList.add('block');
+            block.textContent = type;
+            block.dataset.row = r;
+            block.dataset.col = c;
+            block.style.backgroundColor = getBlockColor(type);
+            block.onclick = () => handleBlockClick(r, c, block);
+            boardElement.appendChild(block);
+        }
+
+        function getBlockColor(type) {
+            switch (type) {
+                case '?': return '#ffdd77'; // バナナ色
+                case '?': return '#f8f8f8'; // 小麦粉色
+                case '?': return '#ffccdd'; // 砂糖色 (ピンク)
+                case '?': return '#ff4444'; // タイマー色 (赤)
+                default: return '#fff';
+            }
+        }
+
+        // --- ゲームロジック ---
+        function handleBlockClick(r, c, element) {
+            if (isProcessing) return; // 処理中は無視
+
+            if (selectedBlock) {
+                // 2つ目のブロックを選択
+                const r2 = selectedBlock.row;
+                const c2 = selectedBlock.col;
+
+                if (Math.abs(r - r2) + Math.abs(c - c2) === 1) {
+                    // 隣接している場合、スワップしてチェック
+                    swapBlocks(r, c, r2, c2);
+                    selectedBlock.element.classList.remove('selected');
+                    selectedBlock = null;
+                    
+                    isProcessing = true;
+                    setTimeout(() => {
+                        checkAndResolveMatches(r, c, r2, c2);
+                    }, 150); // アニメーション時間
+                    
+                } else {
+                    // 隣接していない場合、選択を解除し、新しいブロックを選択
+                    selectedBlock.element.classList.remove('selected');
+                    selectedBlock = { row: r, col: c, element: element };
+                    element.classList.add('selected');
+                }
+            } else {
+                // 1つ目のブロックを選択
+                selectedBlock = { row: r, col: c, element: element };
+                element.classList.add('selected');
+            }
+        }
+
+        function swapBlocks(r1, c1, r2, c2) {
+            // 盤面データ上の入れ替え
+            [board[r1][c1], board[r2][c2]] = [board[r2][c2], board[r1][c1]];
+
+            // DOM上の入れ替え (アニメーション用)
+            const block1 = boardElement.querySelector(`[data-row="${r1}"][data-col="${c1}"]`);
+            const block2 = boardElement.querySelector(`[data-row="${r2}"][data-col="${c2}"]`);
+
+            // データ属性を入れ替え
+            block1.dataset.row = r2;
+            block1.dataset.col = c2;
+            block2.dataset.row = r1;
+            block2.dataset.col = c1;
+
+            // DOM要素の配置をグリッドの順序通りに戻すために一旦全て削除・再生成 (簡易的な方法)
+            // 実際のゲームではCSS transformやgrid-areaを使って滑らかに移動させる
+            updateBoardDOM();
+        }
+
+        function updateBoardDOM() {
+            boardElement.innerHTML = '';
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    createBlockElement(r, c, board[r][c]);
+                }
+            }
+        }
+
+        async function checkAndResolveMatches(r1, c1, r2, c2) {
+            let matched = false;
+            let totalMatchedBlocks = 0;
+            
+            do {
+                matched = false;
+                const matches = findMatches();
+
+                if (matches.length > 0) {
+                    matched = true;
+                    totalMatchedBlocks += matches.length;
+                    
+                    // マッチの処理 (消去、スコア・時間加算)
+                    await resolveMatches(matches);
+
+                    // ブロックの落下と補充
+                    await dropAndRefill();
+                }
+
+            } while (matched); // 連鎖がある限り繰り返す
+
+            // マフィン完成処理
+            if (totalMatchedBlocks >= 3) {
+                const muffinsMade = Math.floor(totalMatchedBlocks / 3);
+                muffinCount += muffinsMade;
+                muffinCountDisplay.textContent = `${muffinCount} / ${MUFFIN_GOAL}`;
+                
+                // マフィン完成のフィードバック
+                boardElement.style.border = '5px solid gold';
+                setTimeout(() => {
+                    boardElement.style.border = '5px solid #a0522d';
+                }, 100);
+            }
+
+            if (totalMatchedBlocks === 0 && (r1 !== undefined)) {
+                // マッチしなかった場合、元の位置に戻す
+                await swapBlocks(r1, c1, r2, c2); 
+            }
+            
+            isProcessing = false;
+            updateBoardDOM(); // 最終的な盤面の更新
+        }
+        
+        function findMatches() {
+            const matches = [];
+            
+            // 垂直チェック
+            for (let c = 0; c < COLS; c++) {
+                for (let r = 0; r <= ROWS - 3; r++) {
+                    const type = board[r][c];
+                    if (type === '0') continue; // 空ブロックは無視
+                    if (board[r+1][c] === type && board[r+2][c] === type) {
+                        for (let i = 0; i < 3; i++) {
+                            matches.push({r: r+i, c: c});
+                        }
+                    }
+                }
+            }
+
+            // 水平チェック
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c <= COLS - 3; c++) {
+                    const type = board[r][c];
+                    if (type === '0') continue;
+                    if (board[r][c+1] === type && board[r][c+2] === type) {
+                        for (let i = 0; i < 3; i++) {
+                            matches.push({r: r, c: c+i});
+                        }
+                    }
+                }
+            }
+
+            // 重複を削除してユニークなマッチリストを返す
+            const uniqueMatches = Array.from(new Set(matches.map(m => `${m.r},${m.c}`)))
+                                    .map(s => { const [r, c] = s.split(','); return { r: parseInt(r), c: parseInt(c) }; });
+            return uniqueMatches;
+        }
+
+        function resolveMatches(matches) {
+            return new Promise(resolve => {
+                let timeExtension = 0;
+                matches.forEach(({ r, c }) => {
+                    const type = board[r][c];
+                    
+                    if (type === '?') {
+                        // オーブンタイマー処理: 時間延長
+                        timeExtension += 2;
+                        score += 100;
+                    } else {
+                        score += 10;
+                    }
+                    board[r][c] = '0'; // 盤面データを空にする
+                    
+                    // DOM要素をアニメーション付きで消去 (例: 透明にする)
+                    const element = boardElement.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+                    if (element) {
+                        element.style.opacity = '0';
+                    }
+                });
+
+                if (timeExtension > 0) {
+                    timeLeft += timeExtension;
+                    timeDisplay.textContent = timeLeft;
+                    // 時間延長の視覚的フィードバック
+                    timeDisplay.style.color = 'lime';
+                    setTimeout(() => { timeDisplay.style.color = '#382c1e'; }, 300);
+                }
+                
+                scoreDisplay.textContent = score;
+
+                // アニメーションを待ってから次に進む
+                setTimeout(resolve, 300);
+            });
+        }
+
+        function dropAndRefill() {
+            return new Promise(resolve => {
+                // 落下処理
+                for (let c = 0; c < COLS; c++) {
+                    let writeRow = ROWS - 1; // 書き込み位置
+                    // 下から上にスキャン
+                    for (let r = ROWS - 1; r >= 0; r--) {
+                        if (board[r][c] !== '0') {
+                            // 空でないブロックを見つけたら、書き込み位置に移動
+                            if (r !== writeRow) {
+                                board[writeRow][c] = board[r][c];
+                                board[r][c] = '0';
+                            }
+                            writeRow--;
+                        }
+                    }
+                    // 新しいブロックの補充
+                    for (let r = 0; r <= writeRow; r++) {
+                        board[r][c] = getRandomBlockType();
+                    }
+                }
+                
+                updateBoardDOM(); // 盤面を更新して落下後の状態を表示
+                
+                // 落下アニメーションを待つ
+                setTimeout(resolve, 300);
+            });
+        }
+
+        // --- タイマーとゲームオーバー ---
+        function updateTimer() {
+            if (timeLeft > 0) {
+                timeLeft--;
+                timeDisplay.textContent = timeLeft;
+
+                if (timeLeft <= 10) {
+                    timeDisplay.style.color = 'red';
+                } else {
+                    timeDisplay.style.color = '#382c1e';
+                }
+            } else {
+                gameOver();
+            }
+        }
+
+        function gameOver() {
+            clearInterval(gameInterval);
+            isProcessing = true; // 操作を停止
+            
+            finalMuffinsDisplay.textContent = `完成マフィン: ${muffinCount}個 (スコア: ${score})`;
+            gameOverScreen.style.display = 'flex';
+        }
+
+        // --- イベントリスナー ---
+        restartButton.addEventListener('click', startGame);
+
+        // --- ゲーム開始 ---
+        startGame();
+    </script>
+</body>
+</html>
